@@ -12,12 +12,22 @@ app.get('/', async (req, res) => {
     const targetUrl = `https://www.instagram.com/${username}/`;
 
     try {
+        // Daha gerçekçi bir tarayıcı gibi görünmek için başlıklar (headers) ekledik
         const response = await axios.get(targetUrl, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                'Accept-Language': 'en-US,en;q=0.9,tr;q=0.8',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Cache-Control': 'max-age=0'
             },
-            timeout: 15000
+            timeout: 15000 // 15 saniye timeout
         });
 
         const html = response.data;
@@ -28,16 +38,24 @@ app.get('/', async (req, res) => {
             bio: 'Bu kullanıcının profili gizli.'
         };
 
-        const picMatch = html.match(/<meta property="og:image" content="([^"]+)"/i);
-        if (picMatch) {
+        // --- GELİŞMİŞ VERİ AYIKLAMA ---
+
+        // 1. Profil Resmi (Birden fazla olası etiketi deneyelim)
+        const picMatch = html.match(/<meta property="og:image" content="([^"]+)"/i) ||
+                          html.match(/<meta property="og:image:url" content="([^"]+)"/i) ||
+                          html.match(/<link rel="image_src" href="([^"]+)"/i);
+
+        if (picMatch && picMatch[1]) {
             profileData.profile_pic_url = picMatch[1];
         }
 
+        // 2. Profil Adı (Sayfa başlığından daha esnek ayıklama)
         const titleMatch = html.match(/<title>(.*?)<\/title>/i);
-        if (titleMatch) {
+        if (titleMatch && titleMatch[1]) {
             const title = titleMatch[1];
+            // Başlık formatı: "İsim (@kullaniciadi) • Instagram photos and videos"
             const nameMatch = title.match(/^(.*?)\s*$$@[^)]+$$/);
-            if (nameMatch) {
+            if (nameMatch && nameMatch[1]) {
                 profileData.full_name = nameMatch[1].trim();
             }
         }
