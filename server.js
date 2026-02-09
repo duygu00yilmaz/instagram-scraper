@@ -1,51 +1,55 @@
 const express = require('express');
-const puppeteer = require('puppeteer');
+const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get('/scrape', async (req, res) => {
+app.get('/', async (req, res) => {
     const username = req.query.username;
     if (!username) {
-        return res.status(400).json({ error: 'Username parameter is missing' });
+        return res.status(400).json({ error: 'Username query parameter is required.' });
     }
 
-    let browser;
+    const targetUrl = `https://www.instagram.com/${username}/`;
+
     try {
-        browser = await puppeteer.launch({
-            headless: "new", // Yeni headless modu
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
-        });
-        const page = await browser.newPage();
-        await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'networkidle2', timeout: 30000 });
-        await page.waitForTimeout(3000); // 3 saniye bekle
-
-        const data = await page.evaluate(() => {
-            const picUrl = document.querySelector('meta[property="og:image"]')?.getAttribute('content') || null;
-            const title = document.querySelector('meta[property="og:title"]')?.getAttribute('content') || null;
-            return { profile_pic_url: picUrl, full_name: title };
+        const response = await axios.get(targetUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            },
+            timeout: 15000
         });
 
-        await browser.close();
+        const html = response.data;
+        const profileData = {
+            username: username,
+            full_name: null,
+            profile_pic_url: null,
+            bio: 'Bu kullanıcının profili gizli.'
+        };
 
-        let fullName = null;
-        if (data.full_name) {
-            const match = data.full_name.match(/^(.*?)\s*$$/);
-            fullName = match ? match[1].trim() : data.full_name.trim();
+        const picMatch = html.match(/<meta property="og:image" content="([^"]+)"/i);
+        if (picMatch) {
+            profileData.profile_pic_url = picMatch[1];
         }
 
-        res.json({
-            username: username,
-            profile_pic_url: data.profile_pic_url,
-            full_name: fullName
-        });
+        const titleMatch = html.match(/<title>(.*?)<\/title>/i);
+        if (titleMatch) {
+            const title = titleMatch[1];
+            const nameMatch = title.match(/^(.*?)\s*$$@[^)]+$$/);
+            if (nameMatch) {
+                profileData.full_name = nameMatch[1].trim();
+            }
+        }
+
+        res.json(profileData);
 
     } catch (error) {
-        if (browser) await browser.close();
-        console.error(error);
-        res.status(500).json({ error: 'Scraping failed' });
+        console.error("Failed to fetch Instagram page:", error.message);
+        res.status(500).json({ error: 'Failed to fetch profile data from Instagram.' });
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`Instagram scraper running on port ${PORT}`);
+    console.log(`Instagram proxy server is running on port ${PORT}`);
 });
