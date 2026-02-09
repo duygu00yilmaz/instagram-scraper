@@ -12,7 +12,6 @@ app.get('/', async (req, res) => {
     const targetUrl = `https://www.instagram.com/${username}/`;
 
     try {
-        // Daha gerçekçi bir tarayıcı gibi görünmek için başlıklar (headers)
         const response = await axios.get(targetUrl, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
@@ -27,7 +26,7 @@ app.get('/', async (req, res) => {
                 'Sec-Fetch-Site': 'none',
                 'Cache-Control': 'max-age=0'
             },
-            timeout: 15000 // 15 saniye timeout
+            timeout: 15000
         });
 
         const html = response.data;
@@ -50,13 +49,12 @@ app.get('/', async (req, res) => {
             const scriptMatch = html.match(/<script type="application\/ld\+json"[^>]*>(.*?)<\/script>/s);
             if (scriptMatch && scriptMatch[1]) {
                 const jsonData = JSON.parse(scriptMatch[1]);
-                // JSON yapısındaki ismi bul
                 if (jsonData && jsonData.mainEntityofPage && jsonData.mainEntityofPage.name) {
                     fullName = jsonData.mainEntityofPage.name;
                 }
             }
         } catch (e) {
-            // JSON parse hatası olursa sessizce geç, bir sonraki yöntemi dene
+            // JSON parse hatası olursa sessizce geç
         }
 
         // Eğer JSON-LD'den bulamadıysa, sayfa başlığından (title) dene
@@ -64,7 +62,6 @@ app.get('/', async (req, res) => {
             const titleMatch = html.match(/<title>(.*?)<\/title>/i);
             if (titleMatch && titleMatch[1]) {
                 const title = titleMatch[1];
-                // Başlık formatı: "İsim (@kullaniciadi) • Instagram..."
                 const nameMatch = title.match(/^(.*?)\s*$$@[^)]+$$/);
                 if (nameMatch && nameMatch[1]) {
                     fullName = nameMatch[1].trim();
